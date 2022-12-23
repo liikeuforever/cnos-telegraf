@@ -78,6 +78,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/golang/geo v0.0.0-20190916061304-5b978397cfec
 	github.com/golang/snappy v0.0.4
+	github.com/google/flatbuffers v22.11.24-0.20221207065449-acf39ff056df+incompatible
 	github.com/google/gnxi v0.0.0-20221016143401-2aeceb5a2901
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-github/v32 v32.1.0
@@ -287,7 +288,6 @@ require (
 	github.com/golang-sql/sqlexp v0.0.0-20170517235910-f1bb20e5a188 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/flatbuffers v2.0.0+incompatible // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
