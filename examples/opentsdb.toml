@@ -151,6 +151,8 @@ methods = ["POST", "PUT"]
 ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
 data_format = "opentsdb"
 
+high_priority_io = true
+
 [[outputs.cnosdb]]
 url = "localhost:31006"
 user = "user"

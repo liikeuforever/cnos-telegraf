@@ -126,6 +126,12 @@ func (ac *accumulator) WithTracking(maxTracked int) telegraf.TrackingAccumulator
 	}
 }
 
+func (ac *accumulator) ToHighPriority() telegraf.HighPriorityAccumulator {
+	return &highPriorityAccumulator{
+		ac,
+	}
+}
+
 type trackingAccumulator struct {
 	telegraf.Accumulator
 	delivered chan telegraf.DeliveryInfo
@@ -157,4 +163,20 @@ func (a *trackingAccumulator) onDelivery(info telegraf.DeliveryInfo) {
 		// tracking than space requested.
 		panic("channel is full")
 	}
+}
+
+type highPriorityAccumulator struct {
+	*accumulator
+}
+
+func (ac *highPriorityAccumulator) AddMetricHighPriority(m telegraf.Metric) error {
+	m.SetTime(m.Time().Round(ac.precision))
+	if m := ac.maker.MakeMetric(m); m != nil {
+		errCh := make(chan error, 1)
+		ac.metrics <- m.ToHighPriority(errCh)
+
+		err := <-errCh
+		return err
+	}
+	return nil
 }

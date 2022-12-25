@@ -247,6 +247,10 @@ func (sl *SocketListener) Stop() {
 	sl.wg.Wait()
 }
 
+func (sl *SocketListener) MarkHighPriority() {
+	// Do nothing
+}
+
 func init() {
 	inputs.Add("socket_listener", func() telegraf.Input {
 		return &SocketListener{}

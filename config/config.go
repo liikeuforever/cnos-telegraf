@@ -1322,6 +1322,12 @@ func (c *Config) addInput(name string, table *ast.Table) error {
 	if err != nil {
 		return err
 	}
+	if pluginConfig.HighPriorityIO {
+		if _, ok = input.(telegraf.HighPriorityInput); !ok {
+			return fmt.Errorf("input plugin %s is not high priority input plugin", pluginConfig.Name)
+		}
+		log.Printf("I! [agent] Input plugin %s is high-priority-IO\n", pluginConfig.Name)
+	}
 
 	if err := c.toml.UnmarshalTable(table, input); err != nil {
 		return err
@@ -1474,6 +1480,7 @@ func (c *Config) buildInput(name string, tbl *ast.Table) (*models.InputConfig, e
 	c.getFieldString(tbl, "name_suffix", &cp.MeasurementSuffix)
 	c.getFieldString(tbl, "name_override", &cp.NameOverride)
 	c.getFieldString(tbl, "alias", &cp.Alias)
+	c.getFieldBool(tbl, "high_priority_io", &cp.HighPriorityIO)
 
 	cp.Tags = make(map[string]string)
 	if node, ok := tbl.Fields["tags"]; ok {
@@ -1555,6 +1562,9 @@ func (c *Config) missingTomlField(_ reflect.Type, key string) error {
 
 	// Parser and serializer options to ignore
 	case "data_type", "influx_parser_type":
+
+	// Customized options
+	case "high_priority_io":
 
 	default:
 		c.unusedFieldsMutex.Lock()

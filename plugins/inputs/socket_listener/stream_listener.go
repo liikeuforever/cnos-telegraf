@@ -238,7 +238,18 @@ func (l *streamListener) read(acc telegraf.Accumulator, conn net.Conn) error {
 			continue
 		}
 		for _, m := range metrics {
-			acc.AddMetric(m)
+			switch ac := acc.(type) {
+			case telegraf.HighPriorityAccumulator:
+				l.Log.Debugf("input socket_listener now writing data to high-priority-IO")
+				if err = ac.AddMetricHighPriority(m); err != nil {
+					l.Log.Debugf("input socket_listener got error from high-priority-IO")
+					acc.AddError(fmt.Errorf("writing data to output failed: %w", err))
+					return fmt.Errorf("writing data to output failed: %v", err)
+				}
+				l.Log.Debugf("input socket_listener got ok from high-priority-IO")
+			default:
+				ac.AddMetric(m)
+			}
 		}
 	}
 

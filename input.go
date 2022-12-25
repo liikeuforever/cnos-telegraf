@@ -21,3 +21,11 @@ type ServiceInput interface {
 	// to the accumulator before returning.
 	Stop()
 }
+
+type HighPriorityInput interface {
+	Input
+
+	// MarkHighPriority does nothing but tell us this input plugin may be a high
+	// priority input plugin.
+	MarkHighPriority()
+}
