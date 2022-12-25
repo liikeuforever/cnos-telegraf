@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	_ "embed"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -241,7 +242,22 @@ func (h *HTTPListenerV2) serveWrite(res http.ResponseWriter, req *http.Request) 
 			m.AddTag(pathTag, req.URL.Path)
 		}
 
-		h.acc.AddMetric(m)
+		switch ac := h.acc.(type) {
+		case telegraf.HighPriorityAccumulator:
+			h.Log.Debugf("input http_listener_v2 now writing data to high-priority-IO")
+			if err = ac.AddMetricHighPriority(m); err != nil {
+				h.Log.Debugf("input http_listener_v2 got error from high-priority-IO")
+				res.WriteHeader(http.StatusInternalServerError)
+				_, err = res.Write([]byte(fmt.Sprintf(`{"error":"%v"}`, err)))
+				if err != nil {
+					h.Log.Debugf("error writing http response: %v", err)
+				}
+				return
+			}
+			h.Log.Debugf("input http_listener_v2 got ok from high-priority-IO")
+		default:
+			ac.AddMetric(m)
+		}
 	}
 
 	res.WriteHeader(http.StatusNoContent)
@@ -353,6 +369,10 @@ func (h *HTTPListenerV2) authenticateIfSet(handler http.HandlerFunc, res http.Re
 	} else {
 		handler(res, req)
 	}
+}
+
+func (h *HTTPListenerV2) MarkHighPriority() {
+	// Do nothing
 }
 
 func init() {

@@ -270,6 +270,22 @@ func (m *metric) Reject() {
 func (m *metric) Drop() {
 }
 
+func (m *metric) ToHighPriority(errorCh chan<- error) telegraf.HighPriorityMetric {
+	return &highPriorityMetric{
+		metric:  m,
+		errorCh: errorCh,
+	}
+}
+
+type highPriorityMetric struct {
+	*metric
+	errorCh chan<- error
+}
+
+func (m *highPriorityMetric) ErrorCh() chan<- error {
+	return m.errorCh
+}
+
 // Convert field to a supported type or nil if inconvertible
 func convertField(v interface{}) interface{} {
 	switch v := v.(type) {

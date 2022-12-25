@@ -121,4 +121,12 @@ type Metric interface {
 	// Drop marks the metric as processed successfully without being written
 	// to any output.
 	Drop()
+
+	ToHighPriority(chan<- error) HighPriorityMetric
+}
+
+type HighPriorityMetric interface {
+	Metric
+
+	ErrorCh() chan<- error
 }
