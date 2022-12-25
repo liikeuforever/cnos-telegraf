@@ -70,6 +70,7 @@ type InputConfig struct {
 	CollectionJitter time.Duration
 	CollectionOffset time.Duration
 	Precision        time.Duration
+	HighPriorityIO   bool
 
 	NameOverride            string
 	MeasurementPrefix       string

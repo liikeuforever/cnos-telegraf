@@ -345,6 +345,9 @@ func (a *Agent) startInputs(
 
 			acc := NewAccumulator(input, dst)
 			acc.SetPrecision(getPrecision(precision, interval))
+			if input.Config.HighPriorityIO {
+				acc = acc.ToHighPriority()
+			}
 
 			err := si.Start(acc)
 			if err != nil {
