@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/binary"
+	"math"
 	"time"
 
 	flatbuffers "github.com/google/flatbuffers/go"
@@ -171,7 +172,7 @@ func (cw *CnosdbWriter) putMetricFields(fb *flatbuffers.Builder, metric telegraf
 			fvOffs[i] = fb.CreateByteVector(numBuf)
 			fTypes[i] = models.FieldTypeUnsigned
 		case float64:
-			binary.BigEndian.PutUint64(numBuf, uint64(field.Value.(float64)))
+			binary.BigEndian.PutUint64(numBuf, math.Float64bits(field.Value.(float64)))
 			fvOffs[i] = fb.CreateByteVector(numBuf)
 			fTypes[i] = models.FieldTypeFloat
 		case bool:
