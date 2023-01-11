@@ -12,9 +12,9 @@ CnosDB-Telegraf 基于 Telegraf 进行开发，增加了一些功能与插件。
 
 增加 Parser 插件 OpenTSDB 和 OpenTSDB-Telnet，用于采集 OpenTSDB 的写入请求。
 
-**OpenTSDB**
+- **OpenTSDB**
 
-通过使用 Input 插件 http_listener_v2 并配置 `data_format` 为 `"opentsdb"`，将能够解析 OpenTSDB 格式的写入请求。
+  通过使用 Input 插件 http_listener_v2 并配置 `data_format` 为 `"opentsdb"`，将能够解析 OpenTSDB 格式的写入请求。
 
 - Linux kernel version 2.6.23 or later
 - Windows 7 or later
@@ -53,8 +53,15 @@ paths = ["/api/put"]
 methods = ["POST", "PUT"]
 data_format = "opentsdb"
 ```
+   ```toml
+   [[inputs.http_listener_v2]]
+   service_address = ":8080"
+   paths = ["/api/put"]
+   methods = ["POST", "PUT"]
+   data_format = "opentsdb"
+   ```
 
-**OpenTSDB-Telnet**
+- **OpenTSDB-Telnet**
 
 ```shell
 # influxdata-archive_compat.key GPG fingerprint:
@@ -70,12 +77,13 @@ EOF
 sudo yum install telegraf
 通过使用 Input 插件 socket_listener，并配置 `data_format` 为 opentsdbtelnet，将能够解析 OpenTSDB-Telnet 格式的写入请求。
 通过使用 Input 插件 socket_listener，并配置 `data_format` 为 `"opentsdbtelnet"`，将能够解析 OpenTSDB-Telnet 格式的写入请求。
+  通过使用 Input 插件 socket_listener，并配置 `data_format` 为 `"opentsdbtelnet"`，将能够解析 OpenTSDB-Telnet 格式的写入请求。
 
-```toml
-[[inputs.socket_listener]]
-service_address = "tcp://:8081"
-data_format = "opentsdbtelnet"
-```
+   ```toml
+   [[inputs.socket_listener]]
+   service_address = "tcp://:8081"
+   data_format = "opentsdbtelnet"
+   ```
 
 ### Output Plugin
 
@@ -131,7 +139,7 @@ password = "pass"
 database = "telegraf"
 ```
 
-**配置介绍**
+- **配置介绍**
 
 | 参数       | 说明               |
 |----------|------------------|
