@@ -1,0 +1,242 @@
+
+# Global tags can be specified here in key="value" format.
+[global_tags]
+# dc = "us-east-1" # will tag all metrics with dc=us-east-1
+# rack = "1a"
+## Environment variables can be used as tags, and throughout the config file
+# user = "$USER"
+
+# Configuration for telegraf agent
+[agent]
+## Default data collection interval for all inputs
+interval = "10s"
+## Rounds collection interval to 'interval'
+## ie, if interval="10s" then always collect on :00, :10, :20, etc.
+round_interval = true
+
+## Telegraf will send metrics to outputs in batches of at most
+## metric_batch_size metrics.
+## This controls the size of writes that Telegraf sends to output plugins.
+metric_batch_size = 1000
+
+## Maximum number of unwritten metrics per output.  Increasing this value
+## allows for longer periods of output downtime without dropping metrics at the
+## cost of higher maximum memory usage.
+metric_buffer_limit = 10000
+
+## Collection jitter is used to jitter the collection by a random amount.
+## Each plugin will sleep for a random time within jitter before collecting.
+## This can be used to avoid many plugins querying things like sysfs at the
+## same time, which can have a measurable effect on the system.
+collection_jitter = "0s"
+
+## Collection offset is used to shift the collection by the given amount.
+## This can be be used to avoid many plugins querying constraint devices
+## at the same time by manually scheduling them in time.
+# collection_offset = "0s"
+
+## Default flushing interval for all outputs. Maximum flush_interval will be
+## flush_interval + flush_jitter
+flush_interval = "10s"
+## Jitter the flush interval by a random amount. This is primarily to avoid
+## large write spikes for users running a large number of telegraf instances.
+## ie, a jitter of 5s and interval 10s means flushes will happen every 10-15s
+flush_jitter = "0s"
+
+## Collected metrics are rounded to the precision specified. Precision is
+## specified as an interval with an integer + unit (e.g. 0s, 10ms, 2us, 4s).
+## Valid time units are "ns", "us" (or "µs"), "ms", "s".
+##
+## By default or when set to "0s", precision will be set to the same
+## timestamp order as the collection interval, with the maximum being 1s:
+##   ie, when interval = "10s", precision will be "1s"
+##       when interval = "250ms", precision will be "1ms"
+##
+## Precision will NOT be used for service inputs. It is up to each individual
+## service input to set the timestamp at the appropriate precision.
+precision = "0s"
+
+## Log at debug level.
+# debug = false
+## Log only error level messages.
+# quiet = false
+
+## Log target controls the destination for logs and can be one of "file",
+## "stderr" or, on Windows, "eventlog".  When set to "file", the output file
+## is determined by the "logfile" setting.
+# logtarget = "file"
+
+## Name of the file to be logged to when using the "file" logtarget.  If set to
+## the empty string then logs are written to stderr.
+# logfile = ""
+
+## The logfile will be rotated after the time interval specified.  When set
+## to 0 no time based rotation is performed.  Logs are rotated only when
+## written to, if there is no log activity rotation may be delayed.
+# logfile_rotation_interval = "0h"
+
+## The logfile will be rotated when it becomes larger than the specified
+## size.  When set to 0 no size based rotation is performed.
+# logfile_rotation_max_size = "0MB"
+
+## Maximum number of rotated archives to keep, any older logs are deleted.
+## If set to -1, no archives are removed.
+# logfile_rotation_max_archives = 5
+
+## Pick a timezone to use when logging or type 'local' for local time.
+## Example: America/Chicago
+# log_with_timezone = ""
+
+## Override default hostname, if empty use os.Hostname()
+hostname = ""
+## If set to true, do no set the "host" tag in the telegraf agent.
+omit_hostname = false
+
+## Method of translating SNMP objects. Can be "netsnmp" (deprecated) which
+## translates by calling external programs snmptranslate and snmptable,
+## or "gosmi" which translates using the built-in gosmi library.
+# snmp_translator = "netsnmp"
+
+[[inputs.kafka_consumer]]
+## Kafka brokers.
+brokers = ["localhost:9092"]
+
+## Topics to consume.
+topics = ["telegraf"]
+
+## When set this tag will be added to all metrics with the topic as the value.
+# topic_tag = ""
+
+## Optional Client id
+# client_id = "Telegraf"
+
+## Set the minimal supported Kafka version.  Setting this enables the use of new
+## Kafka features and APIs.  Must be 0.10.2.0 or greater.
+##   ex: version = "1.1.0"
+# version = ""
+
+## Optional TLS Config
+# enable_tls = false
+# tls_ca = "/etc/telegraf/ca.pem"
+# tls_cert = "/etc/telegraf/cert.pem"
+# tls_key = "/etc/telegraf/key.pem"
+## Use TLS but skip chain & host verification
+# insecure_skip_verify = false
+
+## SASL authentication credentials.  These settings should typically be used
+## with TLS encryption enabled
+# sasl_username = "kafka"
+# sasl_password = "secret"
+
+## Optional SASL:
+## one of: OAUTHBEARER, PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI
+## (defaults to PLAIN)
+# sasl_mechanism = ""
+
+## used if sasl_mechanism is GSSAPI (experimental)
+# sasl_gssapi_service_name = ""
+# ## One of: KRB5_USER_AUTH and KRB5_KEYTAB_AUTH
+# sasl_gssapi_auth_type = "KRB5_USER_AUTH"
+# sasl_gssapi_kerberos_config_path = "/"
+# sasl_gssapi_realm = "realm"
+# sasl_gssapi_key_tab_path = ""
+# sasl_gssapi_disable_pafxfast = false
+
+## used if sasl_mechanism is OAUTHBEARER (experimental)
+# sasl_access_token = ""
+
+## SASL protocol version.  When connecting to Azure EventHub set to 0.
+# sasl_version = 1
+
+# Disable Kafka metadata full fetch
+# metadata_full = false
+
+## Name of the consumer group.
+# consumer_group = "telegraf_metrics_consumers"
+
+## Compression codec represents the various compression codecs recognized by
+## Kafka in messages.
+##  0 : None
+##  1 : Gzip
+##  2 : Snappy
+##  3 : LZ4
+##  4 : ZSTD
+# compression_codec = 0
+## Initial offset position; one of "oldest" or "newest".
+# offset = "oldest"
+
+## Consumer group partition assignment strategy; one of "range", "roundrobin" or "sticky".
+# balance_strategy = "range"
+
+## Maximum number of retries for metadata operations including
+## connecting. Sets Sarama library's Metadata.Retry.Max config value. If 0 or
+## unset, use the Sarama default of 3,
+# metadata_retry_max = 0
+
+## Type of retry backoff. Valid options: "constant", "exponential"
+# metadata_retry_type = "constant"
+
+## Amount of time to wait before retrying. When metadata_retry_type is
+## "constant", each retry is delayed this amount. When "exponential", the
+## first retry is delayed this amount, and subsequent delays are doubled. If 0
+## or unset, use the Sarama default of 250 ms
+# metadata_retry_backoff = 0
+
+## Maximum amount of time to wait before retrying when metadata_retry_type is
+## "exponential". Ignored for other retry types. If 0, there is no backoff
+## limit.
+# metadata_retry_max_duration = 0
+
+## Strategy for making connection to kafka brokers. Valid options: "startup",
+## "defer". If set to "defer" the plugin is allowed to start before making a
+## connection. This is useful if the broker may be down when telegraf is
+## started, but if there are any typos in the broker setting, they will cause
+## connection failures without warning at startup
+# connection_strategy = "startup"
+
+## Maximum length of a message to consume, in bytes (default 0/unlimited);
+## larger messages are dropped
+max_message_len = 1000000
+
+## Maximum messages to read from the broker that have not been written by an
+## output.  For best throughput set based on the number of metrics within
+## each message and the size of the output's metric_batch_size.
+##
+## For example, if each message from the queue contains 10 metrics and the
+## output metric_batch_size is 1000, setting this to 100 will ensure that a
+## full batch is collected and the write is triggered immediately without
+## waiting until the next flush_interval.
+# max_undelivered_messages = 1000
+
+## Maximum amount of time the consumer should take to process messages. If
+## the debug log prints messages from sarama about 'abandoning subscription
+## to [topic] because consuming was taking too long', increase this value to
+## longer than the time taken by the output plugin(s).
+##
+## Note that the effective timeout could be between 'max_processing_time' and
+## '2 * max_processing_time'.
+# max_processing_time = "100ms"
+
+## The default number of message bytes to fetch from the broker in each
+## request (default 1MB). This should be larger than the majority of
+## your messages, or else the consumer will spend a lot of time
+## negotiating sizes and not actually consuming. Similar to the JVM's
+## `fetch.message.max.bytes`.
+# consumer_fetch_default = "1MB"
+
+## Data format to consume.
+## Each data format has its own unique set of configuration options, read
+## more about them here:
+## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
+data_format = "json"
+
+[[outputs.http]]
+url = "http://127.0.0.1:8902/api/v1/write?db=telegraf"
+timeout = "5s"
+method = "POST"
+username = "root"
+password = "root"
+data_format = "influx"
+use_batch_format = true
+content_encoding = "identity"
+idle_conn_timeout = 10
