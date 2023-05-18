@@ -97,13 +97,16 @@ omit_hostname = false
 ## or "gosmi" which translates using the built-in gosmi library.
 # snmp_translator = "netsnmp"
 
-# Generic socket listener capable of handling multiple socket types.
 [[inputs.cnosdb]]
-## URL to listen on
-service_address = ":8081"
+service_address = ":8803"
 
-[[outputs.file]]
-## Files to write to, "stdout" is a specially handled file.
-files = ["/tmp/test_telegraf.out"]
-
+[[outputs.http]]
+url = "http://127.0.0.1:8086/write?db=telegraf"
+timeout = "5s"
+method = "POST"
+username = ""
+password = ""
 data_format = "influx"
+use_batch_format = true
+content_encoding = "identity"
+idle_conn_timeout = 10
