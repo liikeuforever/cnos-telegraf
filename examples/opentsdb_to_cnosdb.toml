@@ -103,13 +103,13 @@ omit_hostname = false
 service_address = ":8080"
 
 ## Paths to listen to.
-paths = ["/remote_write"]
+paths = ["/api/put"]
 
 ## Save path as http_listener_v2_path tag if set to true
 # path_tag = false
 
 ## HTTP methods to accept.
-# methods = ["POST", "PUT"]
+methods = ["POST", "PUT"]
 
 ## maximum duration before timing out read of the request
 # read_timeout = "10s"
@@ -149,10 +149,18 @@ paths = ["/remote_write"]
 ## Each data format has its own unique set of configuration options, read
 ## more about them here:
 ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
-data_format = "prometheusremotewrite"
+data_format = "opentsdb"
 
-[[outputs.cnosdb]]
-url = "localhost:31006"
-user = "user"
-password = "pass"
-database = "telegraf"
+high_priority_io = true
+
+[[outputs.http]]
+url = "http://127.0.0.1:8902/api/v1/write?db=telegraf"
+timeout = "5s"
+method = "POST"
+username = "root"
+password = "root"
+data_format = "influx"
+use_batch_format = true
+content_encoding = "identity"
+idle_conn_timeout = 10
+

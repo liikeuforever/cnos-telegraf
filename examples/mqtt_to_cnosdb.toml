@@ -1,3 +1,4 @@
+# Pull data from MQTT broker and send to Apache-Kafka.
 
 # Global tags can be specified here in key="value" format.
 [global_tags]
@@ -97,106 +98,34 @@ omit_hostname = false
 ## or "gosmi" which translates using the built-in gosmi library.
 # snmp_translator = "netsnmp"
 
-[[inputs.kafka_consumer]]
-## Kafka brokers.
-brokers = ["localhost:9092"]
+[[inputs.mqtt_consumer]]
+## Broker URLs for the MQTT server or cluster.  To connect to multiple
+## clusters or standalone servers, use a separate plugin instance.
+##   example: servers = ["tcp://localhost:1883"]
+##            servers = ["ssl://localhost:1883"]
+##            servers = ["ws://localhost:1883"]
+servers = ["tcp://127.0.0.1:1883"]
 
-## Topics to consume.
-topics = ["telegraf"]
+## Topics that will be subscribed to.
+topics = [
+    "jmeter_mqtt/+/sysinfo",
+]
 
-## When set this tag will be added to all metrics with the topic as the value.
-# topic_tag = ""
+## The message topic will be stored in a tag specified by this value.  If set
+## to the empty string no topic tag will be created.
+# topic_tag = "topic"
 
-## Optional Client id
-# client_id = "Telegraf"
+## QoS policy for messages
+##   0 = at most once
+##   1 = at least once
+##   2 = exactly once
+##
+## When using a QoS of 1 or 2, you should enable persistent_session to allow
+## resuming unacknowledged messages.
+# qos = 0
 
-## Set the minimal supported Kafka version.  Setting this enables the use of new
-## Kafka features and APIs.  Must be 0.10.2.0 or greater.
-##   ex: version = "1.1.0"
-# version = ""
-
-## Optional TLS Config
-# enable_tls = false
-# tls_ca = "/etc/telegraf/ca.pem"
-# tls_cert = "/etc/telegraf/cert.pem"
-# tls_key = "/etc/telegraf/key.pem"
-## Use TLS but skip chain & host verification
-# insecure_skip_verify = false
-
-## SASL authentication credentials.  These settings should typically be used
-## with TLS encryption enabled
-# sasl_username = "kafka"
-# sasl_password = "secret"
-
-## Optional SASL:
-## one of: OAUTHBEARER, PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI
-## (defaults to PLAIN)
-# sasl_mechanism = ""
-
-## used if sasl_mechanism is GSSAPI (experimental)
-# sasl_gssapi_service_name = ""
-# ## One of: KRB5_USER_AUTH and KRB5_KEYTAB_AUTH
-# sasl_gssapi_auth_type = "KRB5_USER_AUTH"
-# sasl_gssapi_kerberos_config_path = "/"
-# sasl_gssapi_realm = "realm"
-# sasl_gssapi_key_tab_path = ""
-# sasl_gssapi_disable_pafxfast = false
-
-## used if sasl_mechanism is OAUTHBEARER (experimental)
-# sasl_access_token = ""
-
-## SASL protocol version.  When connecting to Azure EventHub set to 0.
-# sasl_version = 1
-
-# Disable Kafka metadata full fetch
-# metadata_full = false
-
-## Name of the consumer group.
-# consumer_group = "telegraf_metrics_consumers"
-
-## Compression codec represents the various compression codecs recognized by
-## Kafka in messages.
-##  0 : None
-##  1 : Gzip
-##  2 : Snappy
-##  3 : LZ4
-##  4 : ZSTD
-# compression_codec = 0
-## Initial offset position; one of "oldest" or "newest".
-# offset = "oldest"
-
-## Consumer group partition assignment strategy; one of "range", "roundrobin" or "sticky".
-# balance_strategy = "range"
-
-## Maximum number of retries for metadata operations including
-## connecting. Sets Sarama library's Metadata.Retry.Max config value. If 0 or
-## unset, use the Sarama default of 3,
-# metadata_retry_max = 0
-
-## Type of retry backoff. Valid options: "constant", "exponential"
-# metadata_retry_type = "constant"
-
-## Amount of time to wait before retrying. When metadata_retry_type is
-## "constant", each retry is delayed this amount. When "exponential", the
-## first retry is delayed this amount, and subsequent delays are doubled. If 0
-## or unset, use the Sarama default of 250 ms
-# metadata_retry_backoff = 0
-
-## Maximum amount of time to wait before retrying when metadata_retry_type is
-## "exponential". Ignored for other retry types. If 0, there is no backoff
-## limit.
-# metadata_retry_max_duration = 0
-
-## Strategy for making connection to kafka brokers. Valid options: "startup",
-## "defer". If set to "defer" the plugin is allowed to start before making a
-## connection. This is useful if the broker may be down when telegraf is
-## started, but if there are any typos in the broker setting, they will cause
-## connection failures without warning at startup
-# connection_strategy = "startup"
-
-## Maximum length of a message to consume, in bytes (default 0/unlimited);
-## larger messages are dropped
-max_message_len = 1000000
+## Connection timeout for initial connection in seconds
+# connection_timeout = "30s"
 
 ## Maximum messages to read from the broker that have not been written by an
 ## output.  For best throughput set based on the number of metrics within
@@ -208,21 +137,26 @@ max_message_len = 1000000
 ## waiting until the next flush_interval.
 # max_undelivered_messages = 1000
 
-## Maximum amount of time the consumer should take to process messages. If
-## the debug log prints messages from sarama about 'abandoning subscription
-## to [topic] because consuming was taking too long', increase this value to
-## longer than the time taken by the output plugin(s).
-##
-## Note that the effective timeout could be between 'max_processing_time' and
-## '2 * max_processing_time'.
-# max_processing_time = "100ms"
+## Persistent session disables clearing of the client session on connection.
+## In order for this option to work you must also set client_id to identify
+## the client.  To receive messages that arrived while the client is offline,
+## also set the qos option to 1 or 2 and don't forget to also set the QoS when
+## publishing.
+# persistent_session = false
 
-## The default number of message bytes to fetch from the broker in each
-## request (default 1MB). This should be larger than the majority of
-## your messages, or else the consumer will spend a lot of time
-## negotiating sizes and not actually consuming. Similar to the JVM's
-## `fetch.message.max.bytes`.
-# consumer_fetch_default = "1MB"
+## If unset, a random client ID will be generated.
+# client_id = ""
+
+## Username and password to connect MQTT server.
+# username = "telegraf"
+# password = "metricsmetricsmetricsmetrics"
+
+## Optional TLS Config
+# tls_ca = "/etc/telegraf/ca.pem"
+# tls_cert = "/etc/telegraf/cert.pem"
+# tls_key = "/etc/telegraf/key.pem"
+## Use TLS but skip chain & host verification
+# insecure_skip_verify = false
 
 ## Data format to consume.
 ## Each data format has its own unique set of configuration options, read
@@ -230,9 +164,24 @@ max_message_len = 1000000
 ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
 data_format = "json"
 
-[[outputs.cnosdb]]
-url = "localhost:31006"
-user = "user"
-password = "pass"
-database = "telegraf"
+## Enable extracting tag values from MQTT topics
+## _ denotes an ignored entry in the topic path
+[[inputs.mqtt_consumer.topic_parsing]]
+topic = ""
+measurement = "_/_/measurement"
+tags = "_/tag/_"
+fields = ""
+## Value supported is int, float, unit
+#   [[inputs.mqtt_consumer.topic.types]]
+#      key = type
 
+[[outputs.http]]
+url = "http://127.0.0.1:8902/api/v1/write?db=telegraf"
+timeout = "5s"
+method = "POST"
+username = "root"
+password = "root"
+data_format = "influx"
+use_batch_format = true
+content_encoding = "identity"
+idle_conn_timeout = 10

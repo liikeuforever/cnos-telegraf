@@ -1,4 +1,3 @@
-# Pull data from MQTT broker and send to Apache-Kafka.
 
 # Global tags can be specified here in key="value" format.
 [global_tags]
@@ -98,85 +97,113 @@ omit_hostname = false
 ## or "gosmi" which translates using the built-in gosmi library.
 # snmp_translator = "netsnmp"
 
-[[inputs.mqtt_consumer]]
-## Broker URLs for the MQTT server or cluster.  To connect to multiple
-## clusters or standalone servers, use a separate plugin instance.
-##   example: servers = ["tcp://localhost:1883"]
-##            servers = ["ssl://localhost:1883"]
-##            servers = ["ws://localhost:1883"]
-servers = ["tcp://127.0.0.1:1883"]
+# Generic socket listener capable of handling multiple socket types.
+[[inputs.socket_listener]]
+## URL to listen on
+service_address = "tcp://:8081"
+# service_address = "tcp://:8094"
+# service_address = "tcp://127.0.0.1:http"
+# service_address = "tcp4://:8094"
+# service_address = "tcp6://:8094"
+# service_address = "tcp6://[2001:db8::1]:8094"
+# service_address = "udp://:8094"
+# service_address = "udp4://:8094"
+# service_address = "udp6://:8094"
+# service_address = "unix:///tmp/telegraf.sock"
+# service_address = "unixgram:///tmp/telegraf.sock"
 
-## Topics that will be subscribed to.
-topics = [
-    "jmeter_mqtt/+/sysinfo",
-]
+## Change the file mode bits on unix sockets.  These permissions may not be
+## respected by some platforms, to safely restrict write permissions it is best
+## to place the socket into a directory that has previously been created
+## with the desired permissions.
+##   ex: socket_mode = "777"
+# socket_mode = ""
 
-## The message topic will be stored in a tag specified by this value.  If set
-## to the empty string no topic tag will be created.
-# topic_tag = "topic"
+## Maximum number of concurrent connections.
+## Only applies to stream sockets (e.g. TCP).
+## 0 (default) is unlimited.
+# max_connections = 1024
 
-## QoS policy for messages
-##   0 = at most once
-##   1 = at least once
-##   2 = exactly once
-##
-## When using a QoS of 1 or 2, you should enable persistent_session to allow
-## resuming unacknowledged messages.
-# qos = 0
+## Read timeout.
+## Only applies to stream sockets (e.g. TCP).
+## 0 (default) is unlimited.
+# read_timeout = "30s"
 
-## Connection timeout for initial connection in seconds
-# connection_timeout = "30s"
-
-## Maximum messages to read from the broker that have not been written by an
-## output.  For best throughput set based on the number of metrics within
-## each message and the size of the output's metric_batch_size.
-##
-## For example, if each message from the queue contains 10 metrics and the
-## output metric_batch_size is 1000, setting this to 100 will ensure that a
-## full batch is collected and the write is triggered immediately without
-## waiting until the next flush_interval.
-# max_undelivered_messages = 1000
-
-## Persistent session disables clearing of the client session on connection.
-## In order for this option to work you must also set client_id to identify
-## the client.  To receive messages that arrived while the client is offline,
-## also set the qos option to 1 or 2 and don't forget to also set the QoS when
-## publishing.
-# persistent_session = false
-
-## If unset, a random client ID will be generated.
-# client_id = ""
-
-## Username and password to connect MQTT server.
-# username = "telegraf"
-# password = "metricsmetricsmetricsmetrics"
-
-## Optional TLS Config
-# tls_ca = "/etc/telegraf/ca.pem"
+## Optional TLS configuration.
+## Only applies to stream sockets (e.g. TCP).
 # tls_cert = "/etc/telegraf/cert.pem"
-# tls_key = "/etc/telegraf/key.pem"
-## Use TLS but skip chain & host verification
-# insecure_skip_verify = false
+# tls_key  = "/etc/telegraf/key.pem"
+## Enables client authentication if set.
+# tls_allowed_cacerts = ["/etc/telegraf/clientca.pem"]
+
+## Maximum socket buffer size (in bytes when no unit specified).
+## For stream sockets, once the buffer fills up, the sender will start backing up.
+## For datagram sockets, once the buffer fills up, metrics will start dropping.
+## Defaults to the OS default.
+# read_buffer_size = "64KiB"
+
+## Period between keep alive probes.
+## Only applies to TCP sockets.
+## 0 disables keep alive probes.
+## Defaults to the OS configuration.
+# keep_alive_period = "5m"
 
 ## Data format to consume.
 ## Each data format has its own unique set of configuration options, read
 ## more about them here:
 ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
-data_format = "json"
+data_format = "opentsdbtelnet"
 
-## Enable extracting tag values from MQTT topics
-## _ denotes an ignored entry in the topic path
-[[inputs.mqtt_consumer.topic_parsing]]
-topic = ""
-measurement = "_/_/measurement"
-tags = "_/tag/_"
-fields = ""
-## Value supported is int, float, unit
-#   [[inputs.mqtt_consumer.topic.types]]
-#      key = type
+## Content encoding for message payloads, can be set to "gzip" to or
+## "identity" to apply no encoding.
+# content_encoding = "identity"
 
-[[outputs.cnosdb]]
-url = "localhost:31006"
-user = "user"
-password = "pass"
-database = "telegraf"
+## Message splitting strategy and corresponding settings for stream sockets
+## (tcp, tcp4, tcp6, unix or unixpacket). The setting is ignored for packet
+## listeners such as udp.
+## Available strategies are:
+##   newline         -- split at newlines (default)
+##   null            -- split at null bytes
+##   delimiter       -- split at delimiter byte-sequence in hex-format
+##                      given in `splitting_delimiter`
+##   fixed length    -- split after number of bytes given in `splitting_length`
+##   variable length -- split depending on length information received in the
+##                      data. The length field information is specified in
+##                      `splitting_length_field`.
+# splitting_strategy = "newline"
+
+## Delimiter used to split received data to messages consumed by the parser.
+## The delimiter is a hex byte-sequence marking the end of a message
+## e.g. "0x0D0A", "x0d0a" or "0d0a" marks a Windows line-break (CR LF).
+## The value is case-insensitive and can be specifed with "0x" or "x" prefix
+## or withou.
+## Note: This setting is only used for splitting_strategy = "delimiter".
+# splitting_delimiter = ""
+
+## Fixed length of a message in bytes.
+## Note: This setting is only used for splitting_strategy = "fixed length".
+# splitting_length = 0
+
+## Specification of the length field contained in the data to split messages
+## with variable length. The specification contains the following fields:
+##  offset        -- start of length field in bytes from begin of data
+##  bytes         -- length of length field in bytes
+##  endianness    -- endianness of the value, either "be" for big endian or
+##                   "le" for little endian
+##  header_length -- total length of header to be skipped when passing
+##                   data on to the parser. If zero (default), the header
+##                   is passed on to the parser together with the message.
+## Note: This setting is only used for splitting_strategy = "variable length".
+# splitting_length_field = {offset = 0, bytes = 0, endianness = "be", header_length = 0}
+
+[[outputs.http]]
+url = "http://127.0.0.1:8902/api/v1/write?db=telegraf"
+timeout = "5s"
+method = "POST"
+username = "root"
+password = "root"
+data_format = "influx"
+use_batch_format = true
+content_encoding = "identity"
+idle_conn_timeout = 10
+
