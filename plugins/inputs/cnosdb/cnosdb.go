@@ -4,13 +4,13 @@ package cnosdb
 import (
 	_ "embed"
 	"fmt"
+	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/internal/service"
 	"net"
 	"sync"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/config"
 	"github.com/influxdata/telegraf/plugins/inputs"
-	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/protos/service"
 	"google.golang.org/grpc"
 )
 
@@ -21,12 +21,10 @@ type CnosDB struct {
 	ServiceAddress string          `toml:"service_address"`
 	Timeout        config.Duration `toml:"timeout"`
 
-	Log telegraf.Logger `toml:"-"`
-
-	wg sync.WaitGroup `toml:"-"`
-
-	listener   net.Listener `toml:"-"`
-	grpcServer *grpc.Server `toml:"-"`
+	wg         sync.WaitGroup  `toml:"-"`
+	Log        telegraf.Logger `toml:"-"`
+	listener   net.Listener    `toml:"-"`
+	grpcServer *grpc.Server    `toml:"-"`
 }
 
 func init() {

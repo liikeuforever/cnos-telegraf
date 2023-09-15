@@ -1,24 +1,21 @@
 package cnosdb
 
 import (
-	"encoding/binary"
-	"errors"
 	"fmt"
-	"io"
-	"math"
-
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/influxdata/telegraf"
-	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/protos/models"
-	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/protos/service"
+	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/internal/models"
+	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/internal/service"
+	"io"
 )
 
 //go:generate flatc -o internal/models --go --go-namespace models --gen-onefile ./protos/models/models.fbs
-//go:generate protoc --go_out=./internal --go-grpc_out=./protos ./protos/service/kv_service.proto
+
+//go install google.golang.org/protobuf/cmd/protoc-gen-go@version
+//go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@version
+//go:generate protoc --go_out=./internal --go-grpc_out=./internal ./protos/service/kv_service.proto
 
 var _ service.TSKVServiceServer = (*TSKVServiceServerImpl)(nil)
-
-var errTelegrafClosed = errors.New("telegraf closed")
 
 type TSKVServiceServerImpl struct {
 	accumulator telegraf.Accumulator
@@ -48,81 +45,86 @@ func (s TSKVServiceServerImpl) WritePoints(server service.TSKVService_WritePoint
 		var points models.Points
 		flatbuffers.GetRootAs(req.Points, 0, &points)
 
-		//db := string(points.DbBytes())
 		var table models.Table
-		var schema models.Schema
-		var point models.Point
-		var tag models.Tag
-		var field models.Field
 		for tblI := 0; tblI < points.TablesLength(); tblI++ {
 			if !points.Tables(&table, tblI) {
 				continue
 			}
-			table.Schema(&schema)
-			tab := string(table.TabBytes())
-			for ptI := 0; ptI < table.PointsLength(); ptI++ {
-				if !table.Points(&point, ptI) {
-					continue
-				}
+			tableName := string(table.Tab())
 
-				tags := make(map[string]string)
-				fields := make(map[string]interface{})
-
-				tagsBitSet := BitSet{
-					buf: point.TagsNullbitBytes(),
-					len: schema.TagNameLength(),
-				}
-				if point.TagsLength() > 0 {
-					for tagI := 0; tagI < point.TagsLength(); tagI++ {
-						if !tagsBitSet.get(tagI) {
-							continue
-						}
-						if !point.Tags(&tag, tagI) {
-							continue
-						}
-						tags[string(schema.TagName(tagI))] = string(tag.ValueBytes())
-					}
-				}
-				fieldsBitSet := BitSet{
-					buf: point.FieldsNullbitBytes(),
-					len: schema.FieldNameLength(),
-				}
-				if point.FieldsLength() > 0 {
-					for fieldI := 0; fieldI < point.FieldsLength(); fieldI++ {
-						if !fieldsBitSet.get(fieldI) {
-							continue
-						}
-						if !point.Fields(&field, fieldI) {
-							continue
-						}
-						switch schema.FieldType(fieldI) {
-						case models.FieldTypeInteger:
-							v := binary.BigEndian.Uint64(field.ValueBytes())
-							fields[string(schema.FieldName(fieldI))] = int64(v)
-						case models.FieldTypeUnsigned:
-							v := binary.BigEndian.Uint64(field.ValueBytes())
-							fields[string(schema.FieldName(fieldI))] = v
-						case models.FieldTypeFloat:
-							tmp := binary.BigEndian.Uint64(field.ValueBytes())
-							v := math.Float64frombits(tmp)
-							fields[string(schema.FieldName(fieldI))] = v
-						case models.FieldTypeBoolean:
-							v := field.ValueBytes()
-							fields[string(schema.FieldName(fieldI))] = v[0] == byte(1)
-						case models.FieldTypeString:
-							v := string(field.ValueBytes())
-							fields[string(schema.FieldName(fieldI))] = v
-						default:
-							// Do nothing ?
-						}
-					}
-				}
-				s.accumulator.AddFields(tab, fields, tags)
+			rowReader, err := makeRowReader(&table)
+			if err != nil {
+				s.accumulator.AddError(err)
 			}
 
+			for {
+				fields, tags, ts, hasNext := rowReader.Next()
+				s.accumulator.AddFields(tableName, fields, tags, *ts)
+				if !hasNext {
+					break
+				}
+			}
 		}
 
 	}
 
 	return nil
+}
+
+func makeRowReader(table *models.Table) (*models.RowReader, error) {
+	var tagReaders []*models.StringReader
+	var fieldReaders []interface{}
+	var timeReader *models.IntReader
+
+	numRows := int(table.NumRows())
+	var column models.Column
+	for colI := 0; colI < table.ColumnsLength(); colI++ {
+		if !table.Columns(&column, colI) {
+			continue
+		}
+
+		switch column.ColumnType() {
+		case models.ColumnTypeTime:
+			if r, err := models.NewIntReader(&column, numRows); err == nil {
+				timeReader = r
+			} else {
+				return nil, fmt.Errorf("failed to parse time column from WritePointsRequest: %w", err)
+			}
+		case models.ColumnTypeTag:
+			if r, err := models.NewStringReader(&column, numRows); err == nil {
+				tagReaders = append(tagReaders, r)
+			} else {
+				return nil, fmt.Errorf("failed to parse tag column from WritePointsRequest: %w", err)
+			}
+		case models.ColumnTypeField:
+			switch column.FieldType() {
+			case models.FieldTypeFloat:
+				if r, err := models.NewFloatReader(&column, numRows); err == nil {
+					fieldReaders = append(fieldReaders, r)
+				} else {
+					return nil, fmt.Errorf("failed to parse float column from WritePointsRequest: %w", err)
+				}
+			case models.FieldTypeInteger:
+				if r, err := models.NewIntReader(&column, numRows); err == nil {
+					fieldReaders = append(fieldReaders, r)
+				} else {
+					return nil, fmt.Errorf("failed to parse integer column from WritePointsRequest: %w", err)
+				}
+			case models.FieldTypeUnsigned:
+			case models.FieldTypeBoolean:
+			case models.FieldTypeString:
+				if r, err := models.NewStringReader(&column, numRows); err == nil {
+					fieldReaders = append(fieldReaders, r)
+				} else {
+					return nil, fmt.Errorf("failed to parse string column from WritePointsRequest: %w", err)
+				}
+			default:
+				return nil, fmt.Errorf("unknown field type %d from WritePointsRequest", column.FieldType())
+			}
+		default:
+			return nil, fmt.Errorf("unknown column type %d from WritePointsRequest", column.ColumnType())
+		}
+	}
+
+	return models.NewRowReader(numRows, fieldReaders, tagReaders, timeReader), nil
 }
