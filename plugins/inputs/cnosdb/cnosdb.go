@@ -10,7 +10,7 @@ import (
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/config"
 	"github.com/influxdata/telegraf/plugins/inputs"
-	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/protos/service"
+	service "github.com/influxdata/telegraf/plugins/inputs/cnosdb/protos/service"
 	"google.golang.org/grpc"
 )
 

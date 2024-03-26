@@ -748,3 +748,6 @@ func (n *NopAccumulator) AddMetric(telegraf.Metric)                       {}
 func (n *NopAccumulator) SetPrecision(_ time.Duration)                    {}
 func (n *NopAccumulator) AddError(_ error)                                {}
 func (n *NopAccumulator) WithTracking(_ int) telegraf.TrackingAccumulator { return nil }
+func (n *NopAccumulator) ToHighPriority() telegraf.HighPriorityAccumulator {
+	return nil
+}

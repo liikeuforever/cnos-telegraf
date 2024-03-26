@@ -3,8 +3,8 @@
 package models
 
 import (
-	"strconv"
 	flatbuffers "github.com/google/flatbuffers/go"
+	"strconv"
 )
 
 type FieldType int32
@@ -116,6 +116,7 @@ func PingBodyStartPayloadVector(builder *flatbuffers.Builder, numElems int) flat
 func PingBodyEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }
+
 type Tag struct {
 	_tab flatbuffers.Table
 }
@@ -189,6 +190,7 @@ func TagStartValueVector(builder *flatbuffers.Builder, numElems int) flatbuffers
 func TagEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }
+
 type Field struct {
 	_tab flatbuffers.Table
 }
@@ -262,6 +264,7 @@ func FieldStartValueVector(builder *flatbuffers.Builder, numElems int) flatbuffe
 func FieldEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }
+
 type Schema struct {
 	_tab flatbuffers.Table
 }
@@ -373,6 +376,7 @@ func SchemaStartFieldTypeVector(builder *flatbuffers.Builder, numElems int) flat
 func SchemaEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }
+
 type Point struct {
 	_tab flatbuffers.Table
 }
@@ -553,6 +557,7 @@ func PointStartFieldsNullbitVector(builder *flatbuffers.Builder, numElems int) f
 func PointEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }
+
 type Table struct {
 	_tab flatbuffers.Table
 }
@@ -683,6 +688,7 @@ func TableAddNumRows(builder *flatbuffers.Builder, numRows uint64) {
 func TableEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }
+
 type Points struct {
 	_tab flatbuffers.Table
 }

@@ -1,24 +1,26 @@
 package cnosdb
 
 import (
-	"encoding/binary"
-	"errors"
+	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
-	"math"
+	"log"
+	"time"
 
-	flatbuffers "github.com/google/flatbuffers/go"
+	"github.com/apache/arrow/go/v15/arrow"
+	"github.com/apache/arrow/go/v15/arrow/array"
+	"github.com/apache/arrow/go/v15/arrow/ipc"
 	"github.com/influxdata/telegraf"
-	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/protos/models"
-	"github.com/influxdata/telegraf/plugins/inputs/cnosdb/protos/service"
+	"github.com/influxdata/telegraf/metric"
+	service "github.com/influxdata/telegraf/plugins/inputs/cnosdb/protos/service"
 )
 
 //go:generate flatc -o internal/models --go --go-namespace models --gen-onefile ./protos/models/models.fbs
-//go:generate protoc --go_out=./internal --go-grpc_out=./protos ./protos/service/kv_service.proto
+//go:generate protoc --go_out=./protos/service --go-grpc_out=./protos/service ./protos/service/kv_service.proto
 
 var _ service.TSKVServiceServer = (*TSKVServiceServerImpl)(nil)
-
-var errTelegrafClosed = errors.New("telegraf closed")
 
 type TSKVServiceServerImpl struct {
 	accumulator telegraf.Accumulator
@@ -32,97 +34,117 @@ func NewTSKVService(acc telegraf.Accumulator) service.TSKVServiceServer {
 	}
 }
 
-func (s TSKVServiceServerImpl) WritePoints(server service.TSKVService_WritePointsServer) error {
+func (s TSKVServiceServerImpl) WriteSubscription(server service.TSKVService_WriteSubscriptionServer) error {
 	for {
 		req, err := server.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
+			log.Printf("failed to receive WritePointsRequest: %v", err)
 			s.accumulator.AddError(fmt.Errorf("failed to receive WritePointsRequest: %w", err))
-			return server.Send(&service.WritePointsResponse{
-				PointsNumber: 0,
-			})
+			return server.Send(&service.SubscriptionResponse{})
 		}
 
-		var points models.Points
-		flatbuffers.GetRootAs(req.Points, 0, &points)
+		var tableschema TskvTableSchema
+		if err := json.Unmarshal(req.TableSchema, &tableschema); err != nil {
+			log.Printf("Error unmarshal: %v", err)
+			return server.Send(&service.SubscriptionResponse{})
+		}
 
-		//db := string(points.DbBytes())
-		var table models.Table
-		var schema models.Schema
-		var point models.Point
-		var tag models.Tag
-		var field models.Field
-		for tblI := 0; tblI < points.TablesLength(); tblI++ {
-			if !points.Tables(&table, tblI) {
+		recordReader, err := ipc.NewReader(bufio.NewReader(bytes.NewReader(req.RecordData)))
+		if err != nil {
+			log.Printf("failed to read record data: %v", err)
+			s.accumulator.AddError(fmt.Errorf("failed to read record data: %w", err))
+			return server.Send(&service.SubscriptionResponse{})
+		}
+
+		tab := tableschema.Name
+
+		columnIndexToType := make([]string, len(tableschema.Columns))
+		columnIndexToName := make([]string, len(tableschema.Columns))
+
+		for _, col := range tableschema.Columns {
+			columnIndexToType[col.ID] = col.ColumnType
+			columnIndexToName[col.ID] = col.Name
+		}
+		for {
+			r, err := recordReader.Read()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Printf("failed to read record data: %v", err)
+				s.accumulator.AddError(fmt.Errorf("failed to read record data: %w", err))
 				continue
 			}
-			table.Schema(&schema)
-			tab := string(table.TabBytes())
-			for ptI := 0; ptI < table.PointsLength(); ptI++ {
-				if !table.Points(&point, ptI) {
-					continue
-				}
 
-				tags := make(map[string]string)
-				fields := make(map[string]interface{})
+			numRows := r.NumRows()
+			numCols := r.NumCols()
+			colArrMap := make([]arrow.Array, len(tableschema.Columns))
 
-				tagsBitSet := BitSet{
-					buf: point.TagsNullbitBytes(),
-					len: schema.TagNameLength(),
+			for j, col := range r.Columns() {
+				switch columnIndexToType[j] {
+				case "TAG_STRING":
+					colArrMap[j] = array.NewStringData(col.Data())
+				case "FIELD_STRING":
+					colArrMap[j] = array.NewStringData(col.Data())
+				case "FIELD_BIGINT":
+					colArrMap[j] = array.NewInt64Data(col.Data())
+				case "FIELD_BIGINT UNSIGNED":
+					colArrMap[j] = array.NewUint64Data(col.Data())
+				case "FIELD_DOUBLE":
+					colArrMap[j] = array.NewFloat64Data(col.Data())
+				case "FIELD_BOOLEAN":
+					colArrMap[j] = array.NewBooleanData(col.Data())
+				case "TIME_TIMESTAMP(SECOND)", "TIME_TIMESTAMP(MILLISECOND)", "TIME_TIMESTAMP(MICROSECOND)", "TIME_TIMESTAMP(NANOSECOND)":
+					colArrMap[j] = array.NewTime64Data(col.Data())
 				}
-				if point.TagsLength() > 0 {
-					for tagI := 0; tagI < point.TagsLength(); tagI++ {
-						if !tagsBitSet.get(tagI) {
-							continue
-						}
-						if !point.Tags(&tag, tagI) {
-							continue
-						}
-						tags[string(schema.TagName(tagI))] = string(tag.ValueBytes())
-					}
-				}
-				fieldsBitSet := BitSet{
-					buf: point.FieldsNullbitBytes(),
-					len: schema.FieldNameLength(),
-				}
-				if point.FieldsLength() > 0 {
-					for fieldI := 0; fieldI < point.FieldsLength(); fieldI++ {
-						if !fieldsBitSet.get(fieldI) {
-							continue
-						}
-						if !point.Fields(&field, fieldI) {
-							continue
-						}
-						switch schema.FieldType(fieldI) {
-						case models.FieldTypeInteger:
-							v := binary.BigEndian.Uint64(field.ValueBytes())
-							fields[string(schema.FieldName(fieldI))] = int64(v)
-						case models.FieldTypeUnsigned:
-							v := binary.BigEndian.Uint64(field.ValueBytes())
-							fields[string(schema.FieldName(fieldI))] = v
-						case models.FieldTypeFloat:
-							tmp := binary.BigEndian.Uint64(field.ValueBytes())
-							v := math.Float64frombits(tmp)
-							fields[string(schema.FieldName(fieldI))] = v
-						case models.FieldTypeBoolean:
-							v := field.ValueBytes()
-							fields[string(schema.FieldName(fieldI))] = v[0] == byte(1)
-						case models.FieldTypeString:
-							v := string(field.ValueBytes())
-							fields[string(schema.FieldName(fieldI))] = v
-						default:
-							// Do nothing ?
-						}
-					}
-				}
-				s.accumulator.AddFields(tab, fields, tags)
 			}
 
+			for i := 0; i < int(numRows); i++ {
+				tags := make(map[string]string)
+				fields := make(map[string]interface{})
+				times := time.Unix(0, 0)
+				hasTimestamp := false
+				for j := 0; j < int(numCols); j++ {
+					if colArrMap[j].IsNull(i) {
+						continue
+					}
+					switch columnIndexToType[uint64(j)] {
+					case "TAG_STRING":
+						tags[columnIndexToName[j]] = colArrMap[j].(*array.String).Value(i)
+					case "FIELD_STRING":
+						fields[columnIndexToName[j]] = colArrMap[j].(*array.String).Value(i)
+					case "FIELD_BIGINT":
+						fields[columnIndexToName[j]] = colArrMap[j].(*array.Int64).Value(i)
+					case "FIELD_BIGINT UNSIGNED":
+						fields[columnIndexToName[j]] = colArrMap[j].(*array.Uint64).Value(i)
+					case "FIELD_DOUBLE":
+						fields[columnIndexToName[j]] = colArrMap[j].(*array.Float64).Value(i)
+					case "FIELD_BOOLEAN":
+						fields[columnIndexToName[j]] = colArrMap[j].(*array.Boolean).Value(i)
+					case "TIME_TIMESTAMP(SECOND)":
+						hasTimestamp = true
+						times = time.Unix(int64(colArrMap[j].(*array.Time64).Value(i)), 0)
+					case "TIME_TIMESTAMP(MILLISECOND)":
+						hasTimestamp = true
+						times = time.UnixMilli(int64(colArrMap[j].(*array.Time64).Value(i)))
+					case "TIME_TIMESTAMP(MICROSECOND)":
+						hasTimestamp = true
+						times = time.UnixMicro(int64(colArrMap[j].(*array.Time64).Value(i)))
+					case "TIME_TIMESTAMP(NANOSECOND)":
+						hasTimestamp = true
+						times = time.Unix(0, int64(colArrMap[j].(*array.Time64).Value(i)))
+					}
+				}
+				if hasTimestamp {
+					s.accumulator.AddMetric(metric.New(tab, tags, fields, times))
+				} else {
+					s.accumulator.AddFields(tab, fields, tags)
+				}
+			}
 		}
-
 	}
-
 	return nil
 }
